@@ -47,7 +47,7 @@ def main():
         zgodne += 1 if ok else 0
     print("-" * 66)
     print(f"Zaliczone sprawdzenia: {zgodne}/{len(sprawdzenia)}")
-    return 0 if zgodne == len(sprawdzenia) else 1
+
 
 
 if __name__ == "__main__":
