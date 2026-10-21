@@ -1,8 +1,28 @@
-from flask import Flask
+from flask import Flask, abort, jsonify, request
+
+from services import dostepne_regiony, policz_wskazniki
 
 app = Flask(__name__)
+SCIEZKA_DANYCH = "dane/zamowienia.csv"
 
 
 @app.get("/")
 def index():
-    return f"Panel wskaźników"
+    return "Panel wskaźników"
+
+
+@app.get("/kpi")
+def kpi():
+    region = request.args.get("region")
+    if region is not None and region not in dostepne_regiony(SCIEZKA_DANYCH):
+        abort(404, description=f"Nieznany region: {region}")
+    w = policz_wskazniki(SCIEZKA_DANYCH, region)
+    return f"<h1>Wskaźniki: {w['region']}</h1><p>Marża: {w['marza']:.2%}</p>"
+
+
+@app.get("/api/kpi")
+def api_kpi():
+    region = request.args.get("region")
+    if region is not None and region not in dostepne_regiony(SCIEZKA_DANYCH):
+        abort(404, description=f"Nieznany region: {region}")
+    return jsonify(policz_wskazniki(SCIEZKA_DANYCH, region))
