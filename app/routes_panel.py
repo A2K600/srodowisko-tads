@@ -1,5 +1,5 @@
 from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
-
+from datetime import date
 from .services import (
     dostepne_regiony,
     policz_wskazniki,
@@ -31,6 +31,7 @@ def kpi():
         "panel.html",
         wskazniki=w,
         zestawienie=zestawienie_regionow(sciezka),
+        dzisiaj=date.today(),
     )
 
 
@@ -45,6 +46,7 @@ def region(kod):
         "panel.html",
         wskazniki=policz_wskazniki(sciezka, kod),
         zestawienie=zestawienie_regionow(sciezka),
+        dzisiaj=date.today(),
     )
 
 
