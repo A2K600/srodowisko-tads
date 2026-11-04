@@ -49,3 +49,9 @@ def zapisz_raport(rok, region):
 
 def raporty_roku(rok):
     return [r for r in _RAPORTY if r["rok"] == rok]
+
+def zestawienie_regionow(sciezka):
+    wyniki = []
+    for kod in dostepne_regiony(sciezka):
+        wyniki.append(policz_wskazniki(sciezka, kod))
+    return wyniki
