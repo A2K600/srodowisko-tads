@@ -1,5 +1,5 @@
 import csv
-
+import io
 
 def wczytaj_zamowienia(sciezka):
     with open(sciezka, encoding="utf-8", newline="") as plik:
@@ -61,3 +61,15 @@ def zestawienie_regionow(sciezka):
     for kod in dostepne_regiony(sciezka):
         wyniki.append(policz_wskazniki(sciezka, kod))
     return wyniki
+
+
+WYMAGANE_KOLUMNY = {"data", "region", "przychod", "koszt"}
+
+
+def wczytaj_zbior(strumien):
+    tekst = strumien.read().decode("utf-8")      # zły plik -> UnicodeDecodeError (to też ValueError)
+    czytnik = csv.DictReader(io.StringIO(tekst))
+    brakujace = WYMAGANE_KOLUMNY - set(czytnik.fieldnames or [])
+    if brakujace:
+        raise ValueError("brak kolumn: " + ", ".join(sorted(brakujace)))
+    return sum(1 for _ in czytnik)
