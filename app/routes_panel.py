@@ -1,18 +1,30 @@
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 from datetime import date
+
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+
+from .forms import FiltrForm, RaportForm
 from .services import (
     dostepne_regiony,
     policz_wskazniki,
     raporty_roku,
+    wykaz_raportow,
     zapisz_raport,
     zestawienie_regionow,
 )
-from .forms import FiltrForm
-from .services import dostepne_regiony, policz_wskazniki, raporty_roku, zapisz_raport
 
 panel_bp = Blueprint("panel", __name__)
 
 ROK_DOMYSLNY = 2026
+
 
 @panel_bp.get("/")
 def index():
@@ -43,13 +55,11 @@ def kpi():
     )
 
 
-
 @panel_bp.get("/regiony/<region:kod>")
 def region(kod):
     sciezka = current_app.config["SCIEZKA_DANYCH"]
     if kod not in dostepne_regiony(sciezka):
         abort(404, description=f"Nieznany region: {kod}")
-    liczba = policz_wskazniki(sciezka, kod)["liczba_zamowien"]
     return render_template(
         "panel.html",
         wskazniki=policz_wskazniki(sciezka, kod),
@@ -58,29 +68,24 @@ def region(kod):
     )
 
 
-
 @panel_bp.get("/raporty/", defaults={"rok": ROK_DOMYSLNY})
 @panel_bp.get("/raporty/<int(min=2020, max=2030):rok>")
 def raport(rok):
     return render_template("report.html", rok=rok, zapisane=raporty_roku(rok))
 
 
-
 @panel_bp.route("/raporty/nowy", methods=["GET", "POST"])
 def nowy_raport():
-    if request.method == "GET":
-        return "Wyślij POST z polami rok i region, aby zapisać raport."
-    rok = request.form.get("rok", type=int)
-    region = request.form.get("region")
     sciezka = current_app.config["SCIEZKA_DANYCH"]
-    if rok is None or region not in dostepne_regiony(sciezka):
-        abort(400, description="Niepoprawne dane formularza")
-    if not 2020 <= rok <= 2030:
-        abort(422, description="Rok poza zakresem 2020-2030")
-    zapisz_raport(rok, region)
-    flash(f"Raport za rok {rok} został zapisany", "sukces")
-    return redirect(url_for("panel.raport", rok=rok), 303)
-
+    istniejace = {(r["rok"], r["region"]) for r in wykaz_raportow()}
+    formularz = RaportForm(istniejace=istniejace)
+    formularz.region.choices = [(kod, kod) for kod in dostepne_regiony(sciezka)]
+    if formularz.validate_on_submit():
+        zapisz_raport(formularz.rok.data, formularz.region.data, formularz.uwagi.data)
+        flash(f"Raport za rok {formularz.rok.data} zapisany", "success")
+        return redirect(url_for("panel.raport", rok=formularz.rok.data), 303)
+    status = 422 if formularz.errors else 200
+    return render_template("new_report.html", formularz=formularz), status
 
 
 @panel_bp.get("/stary-panel")

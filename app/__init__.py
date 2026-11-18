@@ -1,13 +1,18 @@
 import logging
 import time
 from datetime import date
+
 from flask import Flask, g
+from flask_wtf.csrf import CSRFProtect
 
 from .config import KONFIGURACJE
 from .converters import RegionConverter
 from .errors import zarejestruj_obsluge_bledow
 from .filters import zarejestruj_filtry
 from .services import dostepne_regiony
+
+csrf = CSRFProtect()
+
 
 def create_app(nazwa_konfiguracji="rozwojowa"):
     app = Flask(__name__)
@@ -24,6 +29,8 @@ def create_app(nazwa_konfiguracji="rozwojowa"):
         czas = (time.perf_counter() - g.start) * 1000
         odpowiedz.headers["X-Czas-Ms"] = f"{czas:.2f}"
         return odpowiedz
+
+    csrf.init_app(app)                           # po before_request i after_request
 
     zarejestruj_obsluge_bledow(app)
     zarejestruj_filtry(app)                      # zl, procent, liczba, data_pl
