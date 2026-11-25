@@ -1,0 +1,12 @@
+{# index.html #}
+{% extends "base.html" %}
+{% block tytul %}Strona startowa{% endblock %}
+{% block tresc %}
+<h1>Panel wskaźników</h1>
+<p>Panel pokazuje przychód, koszt i marżę zamówień z bazy danych, w podziale na regiony.</p>
+<ul>
+  <li><a href="{{ url_for('panel.kpi') }}">Panel wskaźników</a></li>
+  <li><a href="{{ url_for('panel.nowy_raport') }}">Zapis nowego raportu</a></li>
+  <li><a href="{{ url_for('panel.wczytaj') }}">Wczytanie zbioru zamówień (CSV)</a></li>
+</ul>
+{% endblock %}

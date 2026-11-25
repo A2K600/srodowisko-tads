@@ -3,9 +3,10 @@ import io
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError      # ← nowa linijka
 
 from .extensions import db
-from .models import Zamowienie
+from .models import Raport, Zamowienie         # ← dopisz Raport
 
 def dostepne_regiony():
     zapytanie = db.select(Zamowienie.region).distinct().order_by(Zamowienie.region)
@@ -70,19 +71,28 @@ def zestawienie_regionow():
     return wyniki
 
 
-_RAPORTY = []
-
-
-def zapisz_raport(rok, region, uwagi=""):
-    _RAPORTY.append({"rok": rok, "region": region, "uwagi": uwagi})
+def zapisz_raport(rok, region, uwagi="", szczegoly=False):
+    raport = Raport(rok=rok, region=region, uwagi=uwagi, szczegoly=szczegoly)
+    db.session.add(raport)
+    try:
+        db.session.commit()
+    except IntegrityError:                       # para rok-region już jest (UNIQUE)
+        db.session.rollback()
+        return None
+    return raport
 
 
 def wykaz_raportow():
-    return list(_RAPORTY)
+    zapytanie = db.select(Raport).order_by(Raport.rok.desc(), Raport.region)
+    return db.session.scalars(zapytanie).all()
 
 
 def raporty_roku(rok):
-    return [r for r in _RAPORTY if r["rok"] == rok]
+    zapytanie = db.select(Raport).where(Raport.rok == rok).order_by(Raport.region)
+    return [
+        {"rok": r.rok, "region": r.region, "uwagi": r.uwagi}
+        for r in db.session.scalars(zapytanie)
+    ]
 
 
 
