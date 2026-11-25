@@ -10,6 +10,8 @@ from .converters import RegionConverter
 from .errors import zarejestruj_obsluge_bledow
 from .filters import zarejestruj_filtry
 from .services import dostepne_regiony
+from .commands import zarejestruj_polecenia
+from .extensions import db, migrate
 
 csrf = CSRFProtect()
 
@@ -19,6 +21,9 @@ def create_app(nazwa_konfiguracji="rozwojowa"):
     app.config.from_object(KONFIGURACJE[nazwa_konfiguracji])
     app.logger.setLevel(logging.INFO)
     app.url_map.converters["region"] = RegionConverter
+    db.init_app(app)
+    migrate.init_app(app, db, render_as_batch=True)
+    zarejestruj_polecenia(app)
 
     @app.before_request
     def zacznij_pomiar():

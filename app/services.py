@@ -1,5 +1,10 @@
 import csv
 import io
+from datetime import date
+from decimal import Decimal, InvalidOperation
+
+from .extensions import db
+from .models import Zamowienie
 
 def wczytaj_zamowienia(sciezka):
     with open(sciezka, encoding="utf-8", newline="") as plik:
@@ -68,8 +73,21 @@ WYMAGANE_KOLUMNY = {"data", "region", "przychod", "koszt"}
 
 def wczytaj_zbior(strumien):
     tekst = strumien.read().decode("utf-8")      # zły plik -> UnicodeDecodeError (to też ValueError)
-    czytnik = csv.DictReader(io.StringIO(tekst))
-    brakujace = WYMAGANE_KOLUMNY - set(czytnik.fieldnames or [])
-    if brakujace:
-        raise ValueError("brak kolumn: " + ", ".join(sorted(brakujace)))
-    return sum(1 for _ in czytnik)
+    odczyt = csv.DictReader(io.StringIO(tekst))
+    brak = WYMAGANE_KOLUMNY - set(odczyt.fieldnames or [])
+    if brak:
+        raise ValueError("brak kolumn: " + ", ".join(sorted(brak)))
+    numer = 1
+    try:
+        for numer, w in enumerate(odczyt, start=2):
+            db.session.add(Zamowienie(
+                data=date.fromisoformat(w["data"]),
+                region=w["region"],
+                przychod=Decimal(w["przychod"]),
+                koszt=Decimal(w["koszt"]),
+            ))
+        db.session.commit()
+    except (ValueError, InvalidOperation) as blad:
+        db.session.rollback()
+        raise ValueError(f"wiersz {numer}: niepoprawna data lub liczba") from blad
+    return numer - 1
