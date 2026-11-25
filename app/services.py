@@ -2,49 +2,72 @@ import csv
 import io
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from sqlalchemy import func
 
 from .extensions import db
 from .models import Zamowienie
 
-def wczytaj_zamowienia(sciezka):
-    with open(sciezka, encoding="utf-8", newline="") as plik:
-        zamowienia = []
-        for wiersz in csv.DictReader(plik):
-            zamowienia.append({
-                "data": wiersz["data"],
-                "region": wiersz["region"],
-                "przychod": float(wiersz["przychod"]),
-                "koszt": float(wiersz["koszt"]),
-            })
-        return zamowienia
+def dostepne_regiony():
+    zapytanie = db.select(Zamowienie.region).distinct().order_by(Zamowienie.region)
+    return list(db.session.scalars(zapytanie))
 
 
-def dostepne_regiony(sciezka):
-    regiony = {z["region"] for z in wczytaj_zamowienia(sciezka)}
-    return sorted(regiony)
+def _zawez(zapytanie, region, rok):
+    if region:
+        zapytanie = zapytanie.where(Zamowienie.region == region)
+    if rok:
+        zapytanie = zapytanie.where(
+            Zamowienie.data >= date(rok, 1, 1),
+            Zamowienie.data < date(rok + 1, 1, 1),
+        )
+    return zapytanie
 
 
-def policz_wskazniki(sciezka, region=None, rok=None):
-    zamowienia = wczytaj_zamowienia(sciezka)
-    if region is not None:
-        zamowienia = [z for z in zamowienia if z["region"] == region]
-    if rok is not None:
-        zamowienia = [z for z in zamowienia if z["data"].startswith(str(rok))]
-
-    przychod = round(sum(z["przychod"] for z in zamowienia), 2)
-    koszt = round(sum(z["koszt"] for z in zamowienia), 2)
+def _marza(przychod, koszt):
     if przychod == 0:
-        marza = 0.0
-    else:
-        marza = round((przychod - koszt) / przychod, 4)
+        return Decimal("0")
+    return ((przychod - koszt) / przychod).quantize(Decimal("0.0001"))
 
+
+def policz_wskazniki(region=None, rok=None):
+    zapytanie = _zawez(db.select(
+        func.count().label("liczba_zamowien"),
+        func.coalesce(func.sum(Zamowienie.przychod), 0).label("przychod"),
+        func.coalesce(func.sum(Zamowienie.koszt), 0).label("koszt"),
+    ), region, rok)
+    wiersz = db.session.execute(zapytanie).one()
+    przychod, koszt = Decimal(wiersz.przychod), Decimal(wiersz.koszt)
     return {
         "region": region or "wszystkie",
-        "liczba_zamowien": len(zamowienia),
+        "liczba_zamowien": wiersz.liczba_zamowien,
         "przychod": przychod,
         "koszt": koszt,
-        "marza": marza,
+        "marza": _marza(przychod, koszt),
     }
+
+
+def zestawienie_regionow():
+    zapytanie = (
+        db.select(
+            Zamowienie.region,
+            func.count().label("liczba_zamowien"),
+            func.sum(Zamowienie.przychod).label("przychod"),
+            func.sum(Zamowienie.koszt).label("koszt"),
+        )
+        .group_by(Zamowienie.region)
+        .order_by(Zamowienie.region)
+    )
+    wyniki = []
+    for w in db.session.execute(zapytanie):
+        przychod, koszt = Decimal(w.przychod), Decimal(w.koszt)
+        wyniki.append({
+            "region": w.region,
+            "liczba_zamowien": w.liczba_zamowien,
+            "przychod": przychod,
+            "koszt": koszt,
+            "marza": _marza(przychod, koszt),
+        })
+    return wyniki
 
 
 _RAPORTY = []
@@ -61,11 +84,6 @@ def wykaz_raportow():
 def raporty_roku(rok):
     return [r for r in _RAPORTY if r["rok"] == rok]
 
-def zestawienie_regionow(sciezka):
-    wyniki = []
-    for kod in dostepne_regiony(sciezka):
-        wyniki.append(policz_wskazniki(sciezka, kod))
-    return wyniki
 
 
 WYMAGANE_KOLUMNY = {"data", "region", "przychod", "koszt"}
