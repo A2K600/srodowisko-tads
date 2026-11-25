@@ -11,15 +11,16 @@ from flask import (
     url_for,
 )
 from werkzeug.utils import secure_filename
+
 from .forms import FiltrForm, RaportForm, ZbiorForm
 from .services import (
     dostepne_regiony,
     policz_wskazniki,
     raporty_roku,
+    wczytaj_zbior,
     wykaz_raportow,
     zapisz_raport,
     zestawienie_regionow,
-    wczytaj_zbior,
 )
 
 panel_bp = Blueprint("panel", __name__)
@@ -44,26 +45,25 @@ def kpi():
         rok = formularz.rok.data
     else:
         flash("Kryteria zawężenia zostały pominięte", "warning")
-    w = policz_wskazniki(sciezka, region, rok)
+    w = policz_wskazniki(region, rok)
     current_app.logger.info("Obliczono wskaźniki dla regionu %s", w["region"])
     return render_template(
         "panel.html",
         formularz=formularz,
         wskazniki=w,
-        zestawienie=zestawienie_regionow(sciezka),
+        zestawienie=zestawienie_regionow(),
         dzisiaj=date.today(),
     )
 
 
 @panel_bp.get("/regiony/<region:kod>")
 def region(kod):
-    sciezka = current_app.config["SCIEZKA_DANYCH"]
-    if kod not in dostepne_regiony(sciezka):
+    if kod not in dostepne_regiony():
         abort(404, description=f"Nieznany region: {kod}")
     return render_template(
         "panel.html",
-        wskazniki=policz_wskazniki(sciezka, kod),
-        zestawienie=zestawienie_regionow(sciezka),
+        wskazniki=policz_wskazniki(kod),
+        zestawienie=zestawienie_regionow(),
         dzisiaj=date.today(),
     )
 
@@ -76,16 +76,16 @@ def raport(rok):
 
 @panel_bp.route("/raporty/nowy", methods=["GET", "POST"])
 def nowy_raport():
-    sciezka = current_app.config["SCIEZKA_DANYCH"]
     istniejace = {(r["rok"], r["region"]) for r in wykaz_raportow()}
     formularz = RaportForm(istniejace=istniejace)
-    formularz.region.choices = [(kod, kod) for kod in dostepne_regiony(sciezka)]
+    formularz.region.choices = [(kod, kod) for kod in dostepne_regiony()]
     if formularz.validate_on_submit():
         zapisz_raport(formularz.rok.data, formularz.region.data, formularz.uwagi.data)
         flash(f"Raport za rok {formularz.rok.data} zapisany", "success")
         return redirect(url_for("panel.raport", rok=formularz.rok.data), 303)
     status = 422 if formularz.errors else 200
     return render_template("new_report.html", formularz=formularz), status
+
 
 @panel_bp.route("/wczytaj", methods=["GET", "POST"])
 def wczytaj():
@@ -102,6 +102,8 @@ def wczytaj():
             return redirect(url_for("panel.wczytaj"), 303)
     status = 422 if formularz.errors else 200
     return render_template("upload.html", formularz=formularz), status
+
+
 @panel_bp.get("/stary-panel")
 def stary_panel():
     return redirect(url_for("panel.kpi"), 301)
