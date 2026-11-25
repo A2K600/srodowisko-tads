@@ -34,10 +34,9 @@ def index():
 
 @panel_bp.get("/kpi")
 def kpi():
-    sciezka = current_app.config["SCIEZKA_DANYCH"]
     formularz = FiltrForm(request.args)
     formularz.region.choices = [("", "wszystkie")] + [
-        (kod, kod) for kod in dostepne_regiony(sciezka)
+        (kod, kod) for kod in dostepne_regiony()
     ]
     region = rok = None
     if formularz.validate():
